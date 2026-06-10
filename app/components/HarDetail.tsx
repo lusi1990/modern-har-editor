@@ -1,16 +1,26 @@
 'use client';
 
-import React from 'react';
-import { X, Copy } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Copy, Check } from 'lucide-react';
 import { useHarStore } from '../store/useHarStore';
+import { copyToClipboard } from '../utils';
 
 export const HarDetail: React.FC = () => {
   const { entries, selectedEntryId, setSelectedEntry } = useHarStore();
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
   
   const entry = entries.find(e => e._id === selectedEntryId);
 
   if (!selectedEntryId) return null;
   if (!entry) return null;
+
+  const handleCopy = async (text: string, section: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedSection(section);
+      setTimeout(() => setCopiedSection(null), 2000);
+    }
+  };
 
   const formatPayload = (text?: string) => {
     if (!text) return null;
@@ -37,7 +47,16 @@ export const HarDetail: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* General */}
         <section>
-          <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">General</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">General</h3>
+            <button 
+              onClick={() => handleCopy(`${entry.request.method} ${entry.request.url}`, 'general')}
+              className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400"
+              title="Copy method and URL"
+            >
+              {copiedSection === 'general' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            </button>
+          </div>
           <div className="space-y-1 text-xs">
             <div className="flex gap-2">
               <span className="text-zinc-500 w-24 flex-shrink-0">Request URL:</span>
@@ -60,10 +79,10 @@ export const HarDetail: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Request Body ({entry.request.postData.mimeType})</h3>
               <button 
-                onClick={() => navigator.clipboard.writeText(entry.request.postData?.text || '')}
+                onClick={() => handleCopy(entry.request.postData?.text || '', 'requestBody')}
                 className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400"
               >
-                <Copy className="w-3 h-3" />
+                {copiedSection === 'requestBody' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
               </button>
             </div>
             <pre className="text-[11px] bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 p-3 rounded overflow-x-auto font-mono max-h-64 border">
@@ -104,10 +123,10 @@ export const HarDetail: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Response Body</h3>
               <button 
-                onClick={() => navigator.clipboard.writeText(entry.response.content.text || '')}
+                onClick={() => handleCopy(entry.response.content.text || '', 'responseBody')}
                 className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400"
               >
-                <Copy className="w-3 h-3" />
+                {copiedSection === 'responseBody' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
               </button>
             </div>
             <pre className="text-[11px] bg-zinc-950 text-zinc-300 p-3 rounded overflow-x-auto font-mono max-h-96">
