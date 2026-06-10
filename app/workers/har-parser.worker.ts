@@ -9,21 +9,20 @@ interface WorkerContext {
 
 const ctx: WorkerContext = self as unknown as WorkerContext;
 
-// Fallback for crypto.randomUUID
 const generateId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  try {
     return crypto.randomUUID();
+  } catch {
+    return Math.random().toString(36).substring(2) + Date.now().toString(36);
   }
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
 ctx.onmessage = async (e: MessageEvent) => {
   const { file } = e.data;
   if (!file) return;
 
-  console.log('[Worker] Starting parse for file:', file.name, 'size:', file.size);
-  console.time('har-parse');
-
+  console.log('[Worker] Start parsing:', file.name, '(', file.size, 'bytes )');
+  
   const parser = new JSONParser({
     stringBufferSize: 64 * 1024,
   });
@@ -37,85 +36,88 @@ ctx.onmessage = async (e: MessageEvent) => {
   const finish = () => {
     if (isDone) return;
     isDone = true;
-    console.timeEnd('har-parse');
-    console.log('[Worker] Finishing parse. Total entries:', totalEntries);
     
     if (currentBatch.length > 0) {
       ctx.postMessage({ type: 'entries', data: currentBatch });
     }
     
-    // Ensure metadata has required fields for our app to function
-    if (!metadata.version) metadata.version = '1.2';
-    if (!metadata.creator) metadata.creator = { name: 'Unknown', version: '0.0' };
+    // Ensure essential metadata
+    const finalMetadata: HarMetadata = {
+      version: (metadata.version as string) || '1.2',
+      creator: (metadata.creator as { name: string; version: string }) || { name: 'Unknown', version: '0.0' },
+      browser: (metadata.browser as { name: string; version: string } | undefined),
+      pages: (metadata.pages as unknown[] | undefined),
+      comment: (metadata.comment as string | undefined)
+    };
 
-    ctx.postMessage({ type: 'metadata', data: metadata as unknown as HarMetadata });
+    console.log('[Worker] Finished. Total entries found:', totalEntries);
+    ctx.postMessage({ type: 'metadata', data: finalMetadata });
     ctx.postMessage({ type: 'done' });
   };
 
   parser.onValue = ({ value, key, stack }) => {
-    // Collect metadata (everything in 'log' except 'entries')
-    // @streamparser/json stack entries can be string keys or numeric indices
+    // Check if we are inside 'log'
+    const isInsideLog = stack.length > 0 && stack[0] === 'log';
     
-    // HAR structure is {"log": {"version": "1.2", "entries": [...]}}
-    // So stack[0] should be "log"
-    if (stack.length === 1 && stack[0] === 'log') {
-      if (key !== 'entries' && key !== undefined) {
-        metadata[key as string] = value;
+    if (isInsideLog) {
+      if (stack.length === 1) {
+        if (key !== 'entries' && key !== undefined) {
+          metadata[key as string] = value;
+        }
       }
-    }
+      
+      if (stack.length === 2 && stack[1] === 'entries') {
+        if (typeof value === 'object' && value !== null) {
+          const entry: HarEntry = {
+            ...(value as Omit<HarEntry, '_id'>),
+            _id: generateId()
+          };
+          currentBatch.push(entry);
+          totalEntries++;
 
-    // Collect entries
-    // Path: log.entries[i]
-    // stack will be ['log', 'entries', 0], ['log', 'entries', 1], etc.
-    if (stack.length === 2 && stack[0] === 'log' && stack[1] === 'entries') {
-      const entry: HarEntry = {
-        ...(value as Omit<HarEntry, '_id'>),
-        _id: generateId()
-      };
-      currentBatch.push(entry);
-      totalEntries++;
-
-      if (currentBatch.length >= BATCH_SIZE) {
-        ctx.postMessage({ type: 'entries', data: currentBatch });
-        currentBatch = [];
+          if (currentBatch.length >= BATCH_SIZE) {
+            ctx.postMessage({ type: 'entries', data: currentBatch });
+            currentBatch = [];
+          }
+        }
       }
     }
   };
 
   parser.onEnd = () => {
-    console.log('[Worker] Parser onEnd triggered');
+    console.log('[Worker] onEnd event triggered');
     finish();
   };
 
   parser.onError = (err) => {
     console.error('[Worker] Parser error:', err);
-    ctx.postMessage({ type: 'error', data: err.message });
+    ctx.postMessage({ type: 'error', data: `JSON Parser Error: ${err.message}` });
   };
 
-  // Read file as stream
   try {
-    const stream = (file as File).stream();
-    const reader = stream.getReader();
+    const reader = (file as File).stream().getReader();
     let bytesRead = 0;
     
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        console.log('[Worker] File stream reading complete. Bytes read:', bytesRead);
+        console.log('[Worker] Stream done. Total bytes read:', bytesRead);
         break;
       }
       bytesRead += value.length;
-      parser.write(value);
+      parser.write(value as Uint8Array);
     }
     
-    // The parser should trigger onEnd when the JSON is fully parsed.
-    // If it doesn't, we force finish after the stream ends.
-    // We give it a tiny bit of time to process the last chunk.
-    setTimeout(() => finish(), 100);
+    setTimeout(() => {
+      if (!isDone) {
+        console.warn('[Worker] Forcing completion after stream end');
+        finish();
+      }
+    }, 200);
 
   } catch (err: unknown) {
-    console.error('[Worker] Stream read error:', err);
-    const message = err instanceof Error ? err.message : String(err);
-    ctx.postMessage({ type: 'error', data: message });
+    console.error('[Worker] Stream Error:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    ctx.postMessage({ type: 'error', data: `Stream Error: ${msg}` });
   }
 };
