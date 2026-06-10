@@ -139,13 +139,13 @@ export const HarTable: React.FC = () => {
                 {entry.request.url}
               </td>
               <td className="px-4 py-2 text-xs text-zinc-500 truncate w-24">
-                {entry.response.content.mimeType.split(';')[0]}
+                {entry.response.content.mimeType?.split(';')[0] || 'unknown'}
               </td>
               <td className="px-4 py-2 text-xs text-right text-zinc-500 tabular-nums w-20">
                 {formatSize(entry.response.content.size || entry.response.bodySize || 0)}
               </td>
               <td className="px-4 py-2 text-xs text-right text-zinc-500 tabular-nums w-20">
-                {Math.round(entry.time)}ms
+                {Math.round(entry.time || 0)}ms
               </td>
               <td className="px-4 py-2 text-center w-12">
                 <button 
