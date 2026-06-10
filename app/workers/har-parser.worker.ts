@@ -1,7 +1,6 @@
 import { JSONParser } from '@streamparser/json';
 import { HarEntry, HarMetadata } from '../types/har';
 
-// Use a self-referencing interface for the worker
 interface WorkerContext {
   postMessage: (message: unknown) => void;
   onmessage: (event: MessageEvent) => void;
@@ -10,26 +9,21 @@ interface WorkerContext {
 const ctx: WorkerContext = self as unknown as WorkerContext;
 
 const generateId = () => {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return Math.random().toString(36).substring(2) + Date.now().toString(36);
-  }
+  try { return crypto.randomUUID(); } 
+  catch { return Math.random().toString(36).substring(2) + Date.now().toString(36); }
 };
 
 ctx.onmessage = async (e: MessageEvent) => {
   const { file } = e.data;
   if (!file) return;
 
-  console.log('[Worker] Start parsing:', file.name, '(', file.size, 'bytes )');
+  console.log('[Worker] Advanced parsing started for:', file.name);
   
-  const parser = new JSONParser({
-    stringBufferSize: 64 * 1024,
-  });
+  const parser = new JSONParser({ stringBufferSize: 64 * 1024 });
 
   const metadata: Record<string, unknown> = {};
   let currentBatch: HarEntry[] = [];
-  const BATCH_SIZE = 500;
+  const BATCH_SIZE = 200;
   let totalEntries = 0;
   let isDone = false;
 
@@ -41,83 +35,79 @@ ctx.onmessage = async (e: MessageEvent) => {
       ctx.postMessage({ type: 'entries', data: currentBatch });
     }
     
-    // Ensure essential metadata
+    // Fallback metadata if not found
     const finalMetadata: HarMetadata = {
       version: (metadata.version as string) || '1.2',
-      creator: (metadata.creator as { name: string; version: string }) || { name: 'Unknown', version: '0.0' },
+      creator: (metadata.creator as { name: string; version: string }) || { name: 'Firefox-Compatible', version: '1.0' },
       browser: (metadata.browser as { name: string; version: string } | undefined),
       pages: (metadata.pages as unknown[] | undefined),
       comment: (metadata.comment as string | undefined)
     };
 
-    console.log('[Worker] Finished. Total entries found:', totalEntries);
+    console.log('[Worker] Detection finished. Found entries:', totalEntries);
     ctx.postMessage({ type: 'metadata', data: finalMetadata });
     ctx.postMessage({ type: 'done' });
   };
 
   parser.onValue = ({ value, key, stack }) => {
-    // Check if we are inside 'log'
-    const isInsideLog = stack.length > 0 && stack[0] === 'log';
+    // Strategy: Look for ANY object that is an element of an array named 'entries'
+    // Regardless of where that 'entries' array is located in the JSON.
     
-    if (isInsideLog) {
-      if (stack.length === 1) {
-        if (key !== 'entries' && key !== undefined) {
-          metadata[key as string] = value;
-        }
+    const path = stack.join('.');
+    
+    // If we find metadata-like fields anywhere in the first few levels, grab them
+    if (stack.length <= 2 && typeof value !== 'object') {
+      if (key && ['version', 'title', 'name'].includes(key as string)) {
+        metadata[key as string] = value;
       }
-      
-      if (stack.length === 2 && stack[1] === 'entries') {
-        if (typeof value === 'object' && value !== null) {
-          const entry: HarEntry = {
-            ...(value as Omit<HarEntry, '_id'>),
-            _id: generateId()
-          };
-          currentBatch.push(entry);
-          totalEntries++;
+    }
 
-          if (currentBatch.length >= BATCH_SIZE) {
-            ctx.postMessage({ type: 'entries', data: currentBatch });
-            currentBatch = [];
-          }
+    // Capture entry: path will look like "log.entries.0", "entries.5", etc.
+    // We check if 'entries' is the second-to-last element in the stack
+    const entriesIndex = stack.indexOf('entries');
+    if (entriesIndex !== -1 && stack.length === entriesIndex + 2) {
+      if (typeof value === 'object' && value !== null) {
+        const entry: HarEntry = {
+          ...(value as Omit<HarEntry, '_id'>),
+          _id: generateId()
+        };
+        currentBatch.push(entry);
+        totalEntries++;
+
+        if (currentBatch.length >= BATCH_SIZE) {
+          ctx.postMessage({ type: 'entries', data: currentBatch });
+          currentBatch = [];
         }
       }
+    }
+    
+    // Also try to capture creator/browser if they appear
+    if (key === 'creator' || key === 'browser') {
+      metadata[key as string] = value;
     }
   };
 
   parser.onEnd = () => {
-    console.log('[Worker] onEnd event triggered');
+    console.log('[Worker] JSON end reached');
     finish();
   };
 
   parser.onError = (err) => {
-    console.error('[Worker] Parser error:', err);
-    ctx.postMessage({ type: 'error', data: `JSON Parser Error: ${err.message}` });
+    console.error('[Worker] JSON Error:', err);
+    ctx.postMessage({ type: 'error', data: err.message });
   };
 
   try {
     const reader = (file as File).stream().getReader();
-    let bytesRead = 0;
-    
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        console.log('[Worker] Stream done. Total bytes read:', bytesRead);
-        break;
-      }
-      bytesRead += value.length;
+      if (done) break;
       parser.write(value as Uint8Array);
     }
-    
-    setTimeout(() => {
-      if (!isDone) {
-        console.warn('[Worker] Forcing completion after stream end');
-        finish();
-      }
-    }, 200);
-
+    // Final flush
+    setTimeout(finish, 150);
   } catch (err: unknown) {
-    console.error('[Worker] Stream Error:', err);
     const msg = err instanceof Error ? err.message : String(err);
-    ctx.postMessage({ type: 'error', data: `Stream Error: ${msg}` });
+    ctx.postMessage({ type: 'error', data: msg });
   }
 };
