@@ -12,6 +12,16 @@ export const HarDetail: React.FC = () => {
   if (!selectedEntryId) return null;
   if (!entry) return null;
 
+  const formatPayload = (text?: string) => {
+    if (!text) return null;
+    try {
+      // Try to format JSON for better readability
+      return JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      return text;
+    }
+  };
+
   return (
     <div className="w-1/3 flex flex-col bg-white dark:bg-zinc-950 border-l shadow-2xl animate-in slide-in-from-right duration-300">
       <div className="p-4 border-b flex items-center justify-between bg-zinc-50 dark:bg-zinc-900">
@@ -43,6 +53,24 @@ export const HarDetail: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Request Payload (POST Data) */}
+        {entry.request.postData?.text && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Request Body ({entry.request.postData.mimeType})</h3>
+              <button 
+                onClick={() => navigator.clipboard.writeText(entry.request.postData?.text || '')}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400"
+              >
+                <Copy className="w-3 h-3" />
+              </button>
+            </div>
+            <pre className="text-[11px] bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 p-3 rounded overflow-x-auto font-mono max-h-64 border">
+              {formatPayload(entry.request.postData.text)}
+            </pre>
+          </section>
+        )}
 
         {/* Request Headers */}
         <section>
