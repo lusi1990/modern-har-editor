@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { HarUploader } from './components/HarUploader';
 import { HarTable } from './components/HarTable';
 import { HarDetail } from './components/HarDetail';
@@ -9,6 +10,22 @@ import { Loader2 } from 'lucide-react';
 
 export default function Home() {
   const { entries, isLoading } = useHarStore();
+
+  // Global drag/drop prevention
+  useEffect(() => {
+    const preventDefault = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    window.addEventListener('dragover', preventDefault, false);
+    window.addEventListener('drop', preventDefault, false);
+
+    return () => {
+      window.removeEventListener('dragover', preventDefault);
+      window.removeEventListener('drop', preventDefault);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans">
