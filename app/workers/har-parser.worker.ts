@@ -17,9 +17,11 @@ ctx.onmessage = async (e: MessageEvent) => {
   const { file } = e.data;
   if (!file) return;
 
-  console.log('[Worker] Advanced parsing started for:', file.name);
+  console.log('[Worker] Parsing file:', file.name, '(', Math.round(file.size / 1024), 'KB)');
   
-  const parser = new JSONParser({ stringBufferSize: 64 * 1024 });
+  const parser = new JSONParser({ 
+    stringBufferSize: 64 * 1024,
+  });
 
   const metadata: Record<string, unknown> = {};
   let currentBatch: HarEntry[] = [];
@@ -35,37 +37,30 @@ ctx.onmessage = async (e: MessageEvent) => {
       ctx.postMessage({ type: 'entries', data: currentBatch });
     }
     
-    // Fallback metadata if not found
     const finalMetadata: HarMetadata = {
       version: (metadata.version as string) || '1.2',
-      creator: (metadata.creator as { name: string; version: string }) || { name: 'Firefox-Compatible', version: '1.0' },
+      creator: (metadata.creator as { name: string; version: string }) || { name: 'Unknown', version: '1.0' },
       browser: (metadata.browser as { name: string; version: string } | undefined),
       pages: (metadata.pages as unknown[] | undefined),
       comment: (metadata.comment as string | undefined)
     };
 
-    console.log('[Worker] Detection finished. Found entries:', totalEntries);
+    console.log('[Worker] Finished. Total entries found:', totalEntries);
     ctx.postMessage({ type: 'metadata', data: finalMetadata });
     ctx.postMessage({ type: 'done' });
   };
 
   parser.onValue = ({ value, key, stack }) => {
-    // Strategy: Look for ANY object that is an element of an array named 'entries'
-    // Regardless of where that 'entries' array is located in the JSON.
-    
-    const path = stack.join('.');
-    
-    // If we find metadata-like fields anywhere in the first few levels, grab them
-    if (stack.length <= 2 && typeof value !== 'object') {
-      if (key && ['version', 'title', 'name'].includes(key as string)) {
+    if (stack.length === 1 && stack[0] === 'log') {
+      if (key !== 'entries' && key !== undefined) {
         metadata[key as string] = value;
       }
     }
 
-    // Capture entry: path will look like "log.entries.0", "entries.5", etc.
-    // We check if 'entries' is the second-to-last element in the stack
-    const entriesIndex = stack.indexOf('entries');
-    if (entriesIndex !== -1 && stack.length === entriesIndex + 2) {
+    const isEntryArray = stack[stack.length - 1] === 'entries';
+    const isArrayElement = typeof key === 'number';
+
+    if (isEntryArray && isArrayElement) {
       if (typeof value === 'object' && value !== null) {
         const entry: HarEntry = {
           ...(value as Omit<HarEntry, '_id'>),
@@ -80,20 +75,27 @@ ctx.onmessage = async (e: MessageEvent) => {
         }
       }
     }
-    
-    // Also try to capture creator/browser if they appear
-    if (key === 'creator' || key === 'browser') {
-      metadata[key as string] = value;
+
+    // Structural fallback: check if it has request/response but isn't in 'entries'
+    if (!isEntryArray && isArrayElement && stack.length > 0) {
+       const v = value as Record<string, unknown>;
+       if (v && typeof v === 'object' && v.request && v.response) {
+         const entry: HarEntry = {
+          ...(value as Omit<HarEntry, '_id'>),
+          _id: generateId()
+        };
+        currentBatch.push(entry);
+        totalEntries++;
+       }
     }
   };
 
   parser.onEnd = () => {
-    console.log('[Worker] JSON end reached');
     finish();
   };
 
   parser.onError = (err) => {
-    console.error('[Worker] JSON Error:', err);
+    console.error('[Worker] Parser Error:', err);
     ctx.postMessage({ type: 'error', data: err.message });
   };
 
@@ -104,8 +106,7 @@ ctx.onmessage = async (e: MessageEvent) => {
       if (done) break;
       parser.write(value as Uint8Array);
     }
-    // Final flush
-    setTimeout(finish, 150);
+    setTimeout(finish, 100);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     ctx.postMessage({ type: 'error', data: msg });
