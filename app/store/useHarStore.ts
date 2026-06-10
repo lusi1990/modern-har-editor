@@ -28,13 +28,22 @@ export const useHarStore = create<HarState>((set, get) => ({
   fileName: null,
   selectedEntryId: null,
 
-  setLoading: (isLoading) => set({ isLoading }),
-  setMetadata: (metadata) => set({ metadata }),
+  setLoading: (isLoading) => {
+    console.log('[Store] setLoading:', isLoading);
+    set({ isLoading });
+  },
+  setMetadata: (metadata) => {
+    console.log('[Store] setMetadata:', metadata);
+    set({ metadata });
+  },
   setFileName: (fileName) => set({ fileName }),
   
-  addEntries: (newEntries) => set((state) => ({ 
-    entries: [...state.entries, ...newEntries] 
-  })),
+  addEntries: (newEntries) => {
+    console.log('[Store] Adding entries batch:', newEntries.length);
+    set((state) => ({ 
+      entries: [...state.entries, ...newEntries] 
+    }));
+  },
   
   removeEntry: (id) => set((state) => ({
     entries: state.entries.filter((e) => e._id !== id),

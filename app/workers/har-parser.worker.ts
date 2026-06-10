@@ -39,22 +39,34 @@ ctx.onmessage = async (e: MessageEvent) => {
     isDone = true;
     console.timeEnd('har-parse');
     console.log('[Worker] Finishing parse. Total entries:', totalEntries);
+    
     if (currentBatch.length > 0) {
       ctx.postMessage({ type: 'entries', data: currentBatch });
     }
+    
+    // Ensure metadata has required fields for our app to function
+    if (!metadata.version) metadata.version = '1.2';
+    if (!metadata.creator) metadata.creator = { name: 'Unknown', version: '0.0' };
+
     ctx.postMessage({ type: 'metadata', data: metadata as unknown as HarMetadata });
     ctx.postMessage({ type: 'done' });
   };
 
   parser.onValue = ({ value, key, stack }) => {
     // Collect metadata (everything in 'log' except 'entries')
-    // stack is an array of keys/indices
-    if (stack.length === 1 && stack[0] === 'log' && key !== 'entries' && key !== undefined) {
-      metadata[key as string] = value;
+    // @streamparser/json stack entries can be string keys or numeric indices
+    
+    // HAR structure is {"log": {"version": "1.2", "entries": [...]}}
+    // So stack[0] should be "log"
+    if (stack.length === 1 && stack[0] === 'log') {
+      if (key !== 'entries' && key !== undefined) {
+        metadata[key as string] = value;
+      }
     }
 
     // Collect entries
-    // stack: ['log', 'entries']
+    // Path: log.entries[i]
+    // stack will be ['log', 'entries', 0], ['log', 'entries', 1], etc.
     if (stack.length === 2 && stack[0] === 'log' && stack[1] === 'entries') {
       const entry: HarEntry = {
         ...(value as Omit<HarEntry, '_id'>),
@@ -96,14 +108,10 @@ ctx.onmessage = async (e: MessageEvent) => {
       parser.write(value);
     }
     
-    // If the parser didn't trigger onEnd (e.g. malformed JSON or trailing chars)
-    // We wait a bit then finish anyway
-    setTimeout(() => {
-      if (!isDone) {
-        console.warn('[Worker] Parser onEnd not triggered after stream end. Forcing finish.');
-        finish();
-      }
-    }, 500);
+    // The parser should trigger onEnd when the JSON is fully parsed.
+    // If it doesn't, we force finish after the stream ends.
+    // We give it a tiny bit of time to process the last chunk.
+    setTimeout(() => finish(), 100);
 
   } catch (err: unknown) {
     console.error('[Worker] Stream read error:', err);
