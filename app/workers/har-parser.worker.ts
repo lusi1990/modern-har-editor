@@ -51,13 +51,13 @@ ctx.onmessage = async (e: MessageEvent) => {
   };
 
   parser.onValue = ({ value, key, stack }) => {
-    if (stack.length === 1 && stack[0] === 'log') {
+    if (stack.length === 1 && (stack[0] as any) === 'log') {
       if (key !== 'entries' && key !== undefined) {
         metadata[key as string] = value;
       }
     }
 
-    const isEntryArray = stack[stack.length - 1] === 'entries';
+    const isEntryArray = (stack[stack.length - 1] as any) === 'entries';
     const isArrayElement = typeof key === 'number';
 
     if (isEntryArray && isArrayElement) {
