@@ -16,7 +16,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Secure Context Fallbacks**: Many browser APIs (Clipboard, Crypto) require HTTPS. Always implement fallbacks for non-secure contexts (e.g., using the `copyToClipboard` utility in `app/utils.ts`).
 - **Local-Only Processing**: Maintain the "No Server Involved" promise. Do not implement features that send HAR data to any external API.
 
+## Feature-Specific Rules
+- **Privacy Scrubbing**: When extending `sanitizeAllEntries` in `useHarStore.ts`, ensure granular scrubbing (e.g., parsing `Cookie` strings and `URLSearchParams` for `x-www-form-urlencoded`) rather than blanket masking.
+- **Monaco Editor**: Use `@monaco-editor/react` for all code/header editing. Ensure the dark theme (`vs-dark`) is used and that editing state resets correctly when the selected entry changes.
+
 ## Technical Stack
 - **State**: Zustand (`app/store/useHarStore.ts`) for global HAR state and sanitization logic.
+- **Editor**: Monaco Editor for high-fidelity JSON and body editing.
 - **Styling**: Tailwind CSS with `lucide-react` for icons.
 - **Type Safety**: Maintain strict TypeScript interfaces in `app/types/har.ts`. Avoid `any`.

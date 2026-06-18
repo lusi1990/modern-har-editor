@@ -7,14 +7,17 @@ A high-performance, privacy-focused web application for inspecting, filtering, a
 - **⚡ Blazing Fast Parsing**: Uses `@streamparser/json` in a background Web Worker. Even 100MB+ files won't freeze your UI.
 - **📜 Virtual Scrolling**: Powered by `react-virtuoso` to render thousands of network requests at 60FPS.
 - **🔒 Privacy First**: All processing happens locally in your browser. Your sensitive network data never leaves your machine.
-- **🔍 Deep Inspection**: Detailed views for request/response headers, JSON-formatted POST data, and response previews.
-- **✂️ Modify & Export**: Delete unwanted entries and export the sanitized HAR file instantly.
+- **🛡️ One-Click Privacy Scrub**: Automatically mask `Authorization` headers, granular `Cookies`, and sensitive keys (passwords, tokens) in JSON or Form-encoded payloads.
+- **📝 Monaco-Powered Editing**: Full manual editing of Request/Response Headers and Bodies using the VS Code-grade Monaco Editor.
+- **🔍 Deep Inspection**: Detailed views with syntax highlighting for JSON-formatted POST data and response previews.
+- **✂️ Modify & Export**: Delete unwanted entries, edit data, and export the sanitized HAR file instantly.
 - **📏 Resizable UI**: Manually adjustable URL column width to handle long API endpoints.
 - **🛡️ Robust Fallbacks**: Handles non-standard HAR files and provides clipboard fallbacks for non-secure contexts.
 
 ## 🛠️ Tech Stack
 
 - **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
+- **Editor**: [Monaco Editor](https://microsoft.github.io/monaco-editor/) via `@monaco-editor/react`
 - **State Management**: [Zustand](https://zustand-demo.pmnd.rs/)
 - **Parsing**: [@streamparser/json](https://github.com/juanjoDiaz/streamparser-json) (Streaming API)
 - **Rendering**: [React Virtuoso](https://virtuoso.dev/)
@@ -54,8 +57,8 @@ The app is designed around a "Streaming First" architecture:
 
 1. **Uploader**: Captures the file handle via `react-dropzone`.
 2. **Worker**: Creates a `ReadableStream` from the file and feeds it chunk-by-chunk into the JSON parser.
-3. **Store**: Receives entries in batches of 500 to optimize React re-renders.
-4. **Table**: Uses a virtualized table layout with `table-fixed` for high-performance column resizing.
+3. **Store**: Receives entries in batches of 500 to optimize React re-renders and manages sanitization logic.
+4. **Editor**: Integrates Monaco Editor for high-fidelity data modification.
 
 ## 📝 License
 
