@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Copy, Check, Edit3, Save, RotateCcw } from 'lucide-react';
+import { X, Copy, Check, Edit3, Save, RotateCcw, Eye, Zap } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { useHarStore } from '../store/useHarStore';
-import { copyToClipboard } from '../utils';
+import { copyToClipboard, cn } from '../utils';
+import { HarReplay } from './HarReplay';
 
 type EditSection = 'requestHeaders' | 'responseHeaders' | 'requestBody' | 'responseBody' | null;
 
@@ -13,12 +14,14 @@ export const HarDetail: React.FC = () => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [editingSection, setEditingSection] = useState<EditSection>(null);
   const [editValue, setEditValue] = useState('');
+  const [activeTab, setActiveTab] = useState<'inspect' | 'replay'>('inspect');
   
   // Track previous ID to reset editing state when selection changes
   const [prevId, setPrevId] = useState<string | null>(null);
   if (selectedEntryId !== prevId) {
     setPrevId(selectedEntryId);
     setEditingSection(null);
+    setActiveTab('inspect');
   }
 
   const entry = entries.find(e => e._id === selectedEntryId);
@@ -132,7 +135,37 @@ export const HarDetail: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      {/* Tabs */}
+      <div className="flex border-b bg-zinc-50/50 dark:bg-zinc-900/40 p-1 gap-1">
+        <button
+          onClick={() => setActiveTab('inspect')}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+            activeTab === 'inspect'
+              ? "bg-white dark:bg-zinc-900 shadow-sm text-blue-600 dark:text-blue-400"
+              : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          )}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          Inspector
+        </button>
+        <button
+          onClick={() => setActiveTab('replay')}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+            activeTab === 'replay'
+              ? "bg-white dark:bg-zinc-900 shadow-sm text-blue-600 dark:text-blue-400"
+              : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          )}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          Replay & Joint Debug
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        {activeTab === 'inspect' ? (
+          <div className="h-full overflow-y-auto p-4 space-y-6">
         {/* General */}
         <section>
           <div className="flex items-center justify-between mb-2">
@@ -260,6 +293,10 @@ export const HarDetail: React.FC = () => {
               </pre>
             )}
           </section>
+        )}
+          </div>
+        ) : (
+          <HarReplay entry={entry} />
         )}
       </div>
     </div>

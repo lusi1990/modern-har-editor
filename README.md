@@ -51,6 +51,34 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) to start editing.
 
+## 🔁 Request Replay & CORS Solutions
+
+The application includes a built-in HTTP client for replaying and debugging network requests directly from your browser. When testing or joint debugging (联调) against external APIs or local servers, you may encounter CORS (Cross-Origin Resource Sharing) policy blocks.
+
+Here are the two easiest ways to bypass browser CORS restrictions:
+
+### Method 1: Use a Browser Extension (Recommended)
+This is the fastest and most convenient method for web-based API testing.
+1. Install a CORS proxy extension in your browser, such as [Allow CORS: Access-Control-Allow-Origin](https://chromewebstore.google.com/detail/allow-cors-access-control/lhbhbceggnnbacihfpphoidokmgjiplp) or **CORS Unblock**.
+2. Activate the extension (toggle it on/green).
+3. Re-run your request replay in the editor.
+
+### Method 2: Launch Browser with Disabled Web Security
+You can open a separate browser instance with disabled security policies specifically for local testing.
+
+- **macOS**:
+  ```bash
+  open -n -a "Google Chrome" --args --disable-web-security --user-data-dir="/tmp/chrome_dev"
+  ```
+- **Windows**:
+  ```cmd
+  chrome.exe --disable-web-security --user-data-dir="C:/chrome_dev"
+  ```
+- **Linux**:
+  ```bash
+  google-chrome --disable-web-security --user-data-dir="/tmp/chrome_dev"
+  ```
+
 ## 🏗️ Architecture
 
 The app is designed around a "Streaming First" architecture:
