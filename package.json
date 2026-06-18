@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@streamparser/json": "^0.0.22",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

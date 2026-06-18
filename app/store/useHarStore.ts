@@ -15,6 +15,7 @@ interface HarState {
   addEntries: (entries: HarEntry[]) => void;
   removeEntry: (id: string) => void;
   setSelectedEntry: (id: string | null) => void;
+  updateEntry: (id: string, updatedFields: Partial<HarEntry>) => void;
   sanitizeAllEntries: () => void;
   clear: () => void;
   
@@ -117,6 +118,10 @@ export const useHarStore = create<HarState>((set, get) => ({
 
   setSelectedEntry: (id) => set({ selectedEntryId: id }),
 
+  updateEntry: (id, updatedFields) => set((state) => ({
+    entries: state.entries.map((e) => (e._id === id ? { ...e, ...updatedFields } : e))
+  })),
+
   sanitizeAllEntries: () => set((state) => ({
     entries: state.entries.map((entry) => {
       const newEntry = JSON.parse(JSON.stringify(entry)) as HarEntry;
@@ -160,7 +165,7 @@ export const useHarStore = create<HarState>((set, get) => ({
             const scrubbed = scrubObject(json);
             postData.text = JSON.stringify(scrubbed, null, 2);
           } catch {
-            // Not actual JSON
+            // Skip
           }
         }
         
@@ -196,9 +201,10 @@ export const useHarStore = create<HarState>((set, get) => ({
     const { entries, metadata } = get();
     if (!metadata) return '';
     
+    // Remove internal _id before export
     const cleanEntries = entries.map((entry) => {
-      const rest = { ...entry };
-      delete (rest as Partial<HarEntry>)._id;
+      const rest = JSON.parse(JSON.stringify(entry));
+      delete rest._id;
       return rest;
     });
     
