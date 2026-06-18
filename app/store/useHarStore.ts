@@ -70,6 +70,23 @@ const sanitizeSetCookieString = (setCookieStr: string): string => {
   return parts.join(';');
 };
 
+const sanitizeFormString = (formStr: string): string => {
+  try {
+    const params = new URLSearchParams(formStr);
+    const newParams = new URLSearchParams();
+    for (const [key, value] of params.entries()) {
+      if (SENSITIVE_KEY_REGEX.test(key)) {
+        newParams.set(key, '******');
+      } else {
+        newParams.set(key, value);
+      }
+    }
+    return newParams.toString();
+  } catch {
+    return formStr;
+  }
+};
+
 export const useHarStore = create<HarState>((set, get) => ({
   entries: [],
   metadata: null,
@@ -132,13 +149,35 @@ export const useHarStore = create<HarState>((set, get) => ({
       }
 
       // 3. Sanitize Payload
-      if (newEntry.request.postData?.text) {
-        try {
-          const json = JSON.parse(newEntry.request.postData.text);
-          const scrubbed = scrubObject(json);
-          newEntry.request.postData.text = JSON.stringify(scrubbed, null, 2);
-        } catch {
-          // Skip non-JSON
+      const postData = newEntry.request.postData;
+      if (postData) {
+        const mimeType = postData.mimeType.toLowerCase();
+        
+        // Handle JSON
+        if (postData.text && (mimeType.includes('json') || postData.text.trim().startsWith('{'))) {
+          try {
+            const json = JSON.parse(postData.text);
+            const scrubbed = scrubObject(json);
+            postData.text = JSON.stringify(scrubbed, null, 2);
+          } catch {
+            // Not actual JSON
+          }
+        }
+        
+        // Handle Form URLEncoded
+        if (postData.text && mimeType.includes('x-www-form-urlencoded')) {
+          postData.text = sanitizeFormString(postData.text);
+        }
+
+        // Handle HAR params array
+        if (postData.params) {
+          postData.params = postData.params.map((p) => {
+            const param = p as { name: string; value: string };
+            if (SENSITIVE_KEY_REGEX.test(param.name)) {
+              return { ...param, value: '******' };
+            }
+            return param;
+          });
         }
       }
 
