@@ -59,7 +59,7 @@ Here are the two easiest ways to bypass browser CORS restrictions:
 
 ### Method 1: Use a Browser Extension (Recommended)
 This is the fastest and most convenient method for web-based API testing.
-1. Install a CORS proxy extension in your browser, such as [Allow CORS: Access-Control-Allow-Origin](https://chromewebstore.google.com/detail/allow-cors-access-control/lhbhbceggnnbacihfpphoidokmgjiplp) or **CORS Unblock**.
+1. Install a CORS proxy extension in your browser, such as [Allow CORS: Access-Control-Allow-Origin](https://chromewebstore.google.com/detail/allow-cors/nfommabkpincchfljfgedplbfimaipkn) or **CORS Unblock**.
 2. Activate the extension (toggle it on/green).
 3. Re-run your request replay in the editor.
 
