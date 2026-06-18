@@ -22,8 +22,8 @@ interface HarState {
   getHarJson: () => string;
 }
 
-const SENSITIVE_HEADER_REGEX = /^(authorization|cookie|set-cookie|x-auth-token|x-api-key|proxy-authorization)$/i;
-const SENSITIVE_KEY_REGEX = /(password|token|secret|credential|auth|sid|session|key)/i;
+const SENSITIVE_HEADER_REGEX = /^(authorization|x-auth-token|x-api-key|proxy-authorization)$/i;
+const SENSITIVE_KEY_REGEX = /(password|token|secret|credential|auth|sid|session|key|jwt)/i;
 
 const scrubObject = (obj: unknown): unknown => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -41,6 +41,33 @@ const scrubObject = (obj: unknown): unknown => {
     }
   }
   return scrubbed;
+};
+
+const sanitizeCookieString = (cookieStr: string): string => {
+  return cookieStr.split(';').map(part => {
+    const trimmed = part.trim();
+    if (!trimmed) return part;
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) return part;
+    const name = trimmed.substring(0, eqIndex);
+    if (SENSITIVE_KEY_REGEX.test(name)) {
+      return `${name}=******`;
+    }
+    return part;
+  }).join('; ');
+};
+
+const sanitizeSetCookieString = (setCookieStr: string): string => {
+  const parts = setCookieStr.split(';');
+  const firstPart = parts[0];
+  const eqIndex = firstPart.indexOf('=');
+  if (eqIndex !== -1) {
+    const name = firstPart.substring(0, eqIndex).trim();
+    if (SENSITIVE_KEY_REGEX.test(name)) {
+      parts[0] = `${name}=******`;
+    }
+  }
+  return parts.join(';');
 };
 
 export const useHarStore = create<HarState>((set, get) => ({
@@ -61,7 +88,6 @@ export const useHarStore = create<HarState>((set, get) => ({
   setFileName: (fileName) => set({ fileName }),
   
   addEntries: (newEntries) => {
-    console.log('[Store] Adding entries batch:', newEntries.length);
     set((state) => ({ 
       entries: [...state.entries, ...newEntries] 
     }));
@@ -76,33 +102,43 @@ export const useHarStore = create<HarState>((set, get) => ({
 
   sanitizeAllEntries: () => set((state) => ({
     entries: state.entries.map((entry) => {
-      // Create a deep copy for modification
       const newEntry = JSON.parse(JSON.stringify(entry)) as HarEntry;
       
-      // Sanitize Headers
-      newEntry.request.headers = newEntry.request.headers.map((h) => 
-        SENSITIVE_HEADER_REGEX.test(h.name) ? { ...h, value: '******' } : h
-      );
-      newEntry.response.headers = newEntry.response.headers.map((h) => 
-        SENSITIVE_HEADER_REGEX.test(h.name) ? { ...h, value: '******' } : h
-      );
+      // 1. Sanitize Headers
+      newEntry.request.headers = newEntry.request.headers.map((h) => {
+        if (SENSITIVE_HEADER_REGEX.test(h.name)) return { ...h, value: '******' };
+        if (h.name.toLowerCase() === 'cookie') return { ...h, value: sanitizeCookieString(h.value) };
+        return h;
+      });
 
-      // Sanitize Cookies
+      newEntry.response.headers = newEntry.response.headers.map((h) => {
+        if (SENSITIVE_HEADER_REGEX.test(h.name)) return { ...h, value: '******' };
+        if (h.name.toLowerCase() === 'set-cookie') return { ...h, value: sanitizeSetCookieString(h.value) };
+        return h;
+      });
+
+      // 2. Sanitize HAR Cookie Arrays
       if (newEntry.request.cookies) {
-        newEntry.request.cookies = newEntry.request.cookies.map(() => ({ name: 'omitted', value: '******' }));
+        newEntry.request.cookies = newEntry.request.cookies.map((c) => {
+          const cookie = c as { name: string; value: string };
+          return SENSITIVE_KEY_REGEX.test(cookie.name) ? { ...cookie, value: '******' } : cookie;
+        });
       }
       if (newEntry.response.cookies) {
-        newEntry.response.cookies = newEntry.response.cookies.map(() => ({ name: 'omitted', value: '******' }));
+        newEntry.response.cookies = newEntry.response.cookies.map((c) => {
+          const cookie = c as { name: string; value: string };
+          return SENSITIVE_KEY_REGEX.test(cookie.name) ? { ...cookie, value: '******' } : cookie;
+        });
       }
 
-      // Sanitize Payload
+      // 3. Sanitize Payload
       if (newEntry.request.postData?.text) {
         try {
           const json = JSON.parse(newEntry.request.postData.text);
           const scrubbed = scrubObject(json);
           newEntry.request.postData.text = JSON.stringify(scrubbed, null, 2);
         } catch {
-          // Ignore non-JSON
+          // Skip non-JSON
         }
       }
 
@@ -121,7 +157,6 @@ export const useHarStore = create<HarState>((set, get) => ({
     const { entries, metadata } = get();
     if (!metadata) return '';
     
-    // Remove internal _id before export
     const cleanEntries = entries.map((entry) => {
       const rest = { ...entry };
       delete (rest as Partial<HarEntry>)._id;
