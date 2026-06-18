@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 Modern HAR Editor
 
-## Getting Started
+A high-performance, privacy-focused web application for inspecting, filtering, and modifying HTTP Archive (HAR) files. Built with Next.js, Web Workers, and Streaming JSON parsing to handle files of any size without breaking a sweat.
 
-First, run the development server:
+## ✨ Features
+
+- **⚡ Blazing Fast Parsing**: Uses `@streamparser/json` in a background Web Worker. Even 100MB+ files won't freeze your UI.
+- **📜 Virtual Scrolling**: Powered by `react-virtuoso` to render thousands of network requests at 60FPS.
+- **🔒 Privacy First**: All processing happens locally in your browser. Your sensitive network data never leaves your machine.
+- **🔍 Deep Inspection**: Detailed views for request/response headers, JSON-formatted POST data, and response previews.
+- **✂️ Modify & Export**: Delete unwanted entries and export the sanitized HAR file instantly.
+- **📏 Resizable UI**: Manually adjustable URL column width to handle long API endpoints.
+- **🛡️ Robust Fallbacks**: Handles non-standard HAR files and provides clipboard fallbacks for non-secure contexts.
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
+- **State Management**: [Zustand](https://zustand-demo.pmnd.rs/)
+- **Parsing**: [@streamparser/json](https://github.com/juanjoDiaz/streamparser-json) (Streaming API)
+- **Rendering**: [React Virtuoso](https://virtuoso.dev/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Language**: TypeScript (Strict Mode)
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 20+ or [Bun](https://bun.sh/)
+
+### Installation
+
+```bash
+git clone https://github.com/your-username/modern-har-editor.git
+cd modern-har-editor
+npm install
+# or
+bun install
+```
+
+### Running Locally
 
 ```bash
 npm run dev
 # or
-yarn dev
-# or
-pnpm dev
-# or
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to start editing.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🏗️ Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The app is designed around a "Streaming First" architecture:
 
-## Learn More
+1. **Uploader**: Captures the file handle via `react-dropzone`.
+2. **Worker**: Creates a `ReadableStream` from the file and feeds it chunk-by-chunk into the JSON parser.
+3. **Store**: Receives entries in batches of 500 to optimize React re-renders.
+4. **Table**: Uses a virtualized table layout with `table-fixed` for high-performance column resizing.
 
-To learn more about Next.js, take a look at the following resources:
+## 📝 License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
