@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Download, Trash2 } from 'lucide-react';
+import { Download, Trash2, ShieldAlert } from 'lucide-react';
 import { useHarStore } from '../store/useHarStore';
 
 export const HarToolbar: React.FC = () => {
-  const { entries, fileName, clear, getHarJson } = useHarStore();
+  const { entries, fileName, clear, getHarJson, sanitizeAllEntries } = useHarStore();
 
   const handleExport = () => {
     const json = getHarJson();
@@ -20,6 +20,12 @@ export const HarToolbar: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleSanitize = () => {
+    if (confirm('This will permanently mask sensitive data (Auth, Cookies, Passwords) in ALL entries. Are you sure?')) {
+      sanitizeAllEntries();
+    }
+  };
+
   if (entries.length === 0) return null;
 
   return (
@@ -32,6 +38,14 @@ export const HarToolbar: React.FC = () => {
       </div>
       
       <div className="flex items-center gap-2">
+        <button 
+          onClick={handleSanitize}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 rounded-md transition-colors"
+          title="Mask sensitive data in all entries"
+        >
+          <ShieldAlert className="w-4 h-4" />
+          Sanitize
+        </button>
         <button 
           onClick={clear}
           className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-red-600 hover:bg-red-50 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-900/20 rounded-md transition-colors"
